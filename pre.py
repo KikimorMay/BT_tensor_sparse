@@ -67,7 +67,6 @@ def fold(unfold_tensor, mode, shape):
     shape_new = []
     for i in range(dim):
         shape_new.append(shape[(index+i)%dim])
-    print(shape_new)
     tensor = unfold_tensor.reshape(shape_new)
     for i in range(dim - index):
         for j in range(index):
@@ -324,6 +323,7 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
     core = [np.array(rng.random_sample(ranks)) for i in range(n_part)]
     factors = [np.array(rng.random_sample((tensor.shape[index], ranks[index]*n_part))) for index,mode in enumerate(modes)]
 
+    rec_errors = []
     for iteration in range(n_iter_max):
         for mode in modes:
             index = mode - 1
@@ -342,8 +342,11 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
         err = norm(rebuilt_tensor-tensor, 2)/norm(tensor,2)
         print("line:", sys._getframe().f_lineno, 'interation is :', iteration, "err is", err )
 
+        rec_errors.append(err)
+
         # print("the line is:", sys._getframe().f_lineno, "vector_core.shape",vector_core.shape)
-        if():     # 跳出循环的条件
+        if iteration > 5:
+            #if (np.abs(rec_errors[-1] - rec_errors[-2]) < tol):  # 跳出循环的条件
             break
 
     return core, factors
@@ -361,7 +364,8 @@ if __name__ == '__main__':
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
     data_2 = np.random.randn(10,10,10)
 
-    core_tensor_list = block_term_tensor_decomposition(image, modes = [1,2,3], n_part=2, ranks = [20,20,2])
+    core_tensor_list, factors = block_term_tensor_decomposition(image, modes = [1,2,3], n_part=2, ranks = [20,20,2])
+
     eigenvecs, c, _ = partial_svd(unfold(image, 1))
     eigenvecs_2, d, _ = partial_svd(unfold(core_tensor_list[0],1))
     eigenvecs_3, e, _ = partial_svd(unfold(core_tensor_list[1],1))

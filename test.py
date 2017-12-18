@@ -15,13 +15,13 @@ import sys
 #print('the line is:', sys._getframe().f_lineno, )
 
 
-a = np.random.randn(3,4,5,6,7)
-
-b = unfold(a, 4)
-d = fold(b, 4, [3,4,5,6,7])
-print(d.shape)
+a = np.random.randn(3,4)
+b = np.random.randn(4,5)
+print(a.dot(b))
 
 
+
+print(b)
 
 
 
