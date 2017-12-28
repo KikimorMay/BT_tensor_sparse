@@ -7,6 +7,22 @@ from numpy.linalg import pinv
 import scipy.sparse.linalg
 from scipy.misc import face, imresize
 import sys
+
+def constract_data(rank, size, noise):
+    ans = np.zeros(size)
+    for i in range(rank):
+        mid_ans = np.random.randn(size[0], 1)
+        n = len(size) - 1
+        for index in range(n):
+            b = np.random.randn(size[index+1], 1)
+            mid_ans = np.outer(mid_ans, b)
+        mid_ans = mid_ans.reshape(size)
+        ans += mid_ans
+
+    e =  noise * rank * np.random.randn(*size)
+    ans = ans + e
+    return ans
+
 def change(a, b):
     c = a
     a = b
@@ -190,10 +206,10 @@ def multi_mode_dot(tensor, matrix_or_vec_list, modes = None, skip = None, transp
 # 计算两个分块矩阵的kron积， mat_1 = [A1, A2, ..., Ar], mat_2 = [B1, B2, .., Br]  分块矩阵的个数要相同
 def mat_kr(mat_1, mat_2, R):
     I, LR = mat_1.shape
-    L = int(LR/R)
+    L = LR//R
     J, MR = mat_2.shape
-    M = int(MR/R)
-    mat_ans = np.zeros((I*J, L*M*R))
+    M = MR//R
+    mat_ans = np.zeros([I*J, L*M*R])
     for i in range(R):
         mat_ans[:, i*L*M:L*M*(i+1)] = np.kron(mat_1[:, i*L:(i+1)*L], mat_2[:, i*M:(i+1)*M])
     return mat_ans
@@ -236,7 +252,7 @@ def blockdiag(tensor_list, mode, p_inverse = True):
     if p_inverse == False:
         ans_mat = np.zeros([blockdiag_row*R, blockdiag_col*R])
         for index in range(R):
-            ans_mat[index*blockdiag_row:(index+1)*blockdiag_row, index*blockdiag_col:(index+1)*blockdiag_col] = unfold(tensor_list[index], mode)
+            ans_mat[index*blockdiag_row:(index+1)*blockdiag_row, index*blockdiag_col:(index+1)*blockdiag_col] = unfold(tensor_list[index], mode).T
     if p_inverse == True:
         blockdiag_row, blockdiag_col = change(blockdiag_row, blockdiag_col)
         ans_mat = np.zeros([blockdiag_row*R, blockdiag_col*R])
@@ -345,7 +361,7 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
         rec_errors.append(err)
 
         # print("the line is:", sys._getframe().f_lineno, "vector_core.shape",vector_core.shape)
-        if iteration > 5:
+        if iteration > 100:
             #if (np.abs(rec_errors[-1] - rec_errors[-2]) < tol):  # 跳出循环的条件
             break
 
@@ -363,18 +379,6 @@ if __name__ == '__main__':
     image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
     data_2 = np.random.randn(10,10,10)
-
-    core_tensor_list, factors = block_term_tensor_decomposition(image, modes = [1,2,3], n_part=2, ranks = [20,20,2])
-
-    eigenvecs, c, _ = partial_svd(unfold(image, 1))
-    eigenvecs_2, d, _ = partial_svd(unfold(core_tensor_list[0],1))
-    eigenvecs_3, e, _ = partial_svd(unfold(core_tensor_list[1],1))
-
-    d_sun = np.sum(d)
-    e_sum = np.sum(e)
-    c_sum = np.sum(c)
-    print(d_sun, e_sum, c_sum)
-
-
-
-    ans = blockdiag(core_tensor_list, 2)
+    ranks = [10, 10, 10]
+    partial_tucker(data, modes=[1,2,3], ranks=ranks, init= None)
+    #block_term_tensor_decomposition(data_2, modes=[1,2,3], ranks = ranks, n_part = 2)

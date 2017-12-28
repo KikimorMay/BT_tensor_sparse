@@ -1,5 +1,5 @@
 #the github https://github.com/kaustubh0mani/Indian_Pines/blob/master/Code/Data_Preparation_Image_Split.py
-# maybe 其他的数据集 http://lesun.weebly.com/hyperspectral-data-set.html
+#maybe 其他的数据集 http://lesun.weebly.com/hyperspectral-data-set.html
 
 import scipy
 import scipy.io as io
@@ -22,4 +22,4 @@ f.seek(offset)#TODO: only header size for tiff !!
 d = np.fromfile(f, dtype=formatdata, count=nb_elem).reshape(framedim)
 
 
-print(d.shape)
+print(input_image.shape)
