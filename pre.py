@@ -268,7 +268,7 @@ def rebuilt_block_term_tensor(cores, factors, modes):
     n_part = len(cores)
     n_mode = len(factors)
     shape_row = [factors[index].shape[0] for index in range(n_mode)]
-    part_col = [factors[index].shape[1]/n_part for index in range(n_mode)]
+    part_col = [factors[index].shape[1]//n_part for index in range(n_mode)]
     rebuilt_tensor = np.zeros(shape_row)
 
     factors_cal = []
@@ -379,6 +379,6 @@ if __name__ == '__main__':
     image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
     data_2 = np.random.randn(10,10,10)
-    ranks = [10, 10, 10]
-    partial_tucker(data, modes=[1,2,3], ranks=ranks, init= None)
-    #block_term_tensor_decomposition(data_2, modes=[1,2,3], ranks = ranks, n_part = 2)
+    ranks = [9, 9, 9]
+    partial_tucker(data_2, modes=[1,2,3], ranks=ranks, init= None)
+    block_term_tensor_decomposition(data_2, modes=[1,2,3], ranks = ranks, n_part = 2)
