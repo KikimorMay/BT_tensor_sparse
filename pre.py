@@ -347,6 +347,7 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
             for i in range(n_part):
                 factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _ = QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
                 # print("the line is:", sys._getframe().f_lineno, "factor_tensor.shape", factors[index].shape)
+
         vector_core = pinv(multi_mat_kr(factors, R=n_part)).dot(tensor.reshape(-1, 1))
         len_core = vector_core.shape[0]//n_part
         for i in range(n_part):
