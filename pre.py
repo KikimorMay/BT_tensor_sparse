@@ -337,6 +337,8 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
     # 随机生成core-tensor，以及factor matrixs
     rng = check_random_state(random_state)
     core = [np.array(rng.random_sample(ranks)) for i in range(n_part)]
+    core_2 = [np.array(rng.random_sample(ranks)) for i in range(n_part)]
+
     factors = [np.array(rng.random_sample((tensor.shape[index], ranks[index]*n_part))) for index,mode in enumerate(modes)]
 
     rec_errors = []
@@ -357,6 +359,14 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
 
             core[i] = multi_mode_dot(tensor, factors_rebult, modes = modes, transpose=True)
             # print("the line is:", sys._getframe().f_lineno, "core_tensor.shape", core[i].shape)
+
+
+        vector_core = pinv(multi_mat_kr(factors, R=n_part)).dot(tensor.reshape(-1, 1))
+        len_core = vector_core.shape[0]//n_part
+        for i in range(n_part):
+            core_2[i] = vector_core[i*len_core:(i+1)*len_core].reshape(ranks)
+
+
 
         # according the core tensor and the factor matrix, 对原矩阵进行恢复
         rebuilt_tensor = rebuilt_block_term_tensor(core, factors, modes)
