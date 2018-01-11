@@ -313,7 +313,7 @@ def partial_tucker(tensor, modes, ranks = None, init = 'SVD',  n_iter_max =100,
             factors[index] = eigenvecs
         core = multi_mode_dot(tensor, factors, modes = modes, transpose=True)
         #对tucker分解得到的部分进行重构形成新的tensor
-        middle_ans = multi_mode_dot(core, factors,modes= modes, transpose=False)
+        middle_ans = multi_mode_dot(core, factors, modes= modes, transpose=False)
         rec_error = norm(tensor - middle_ans, 2)/norm_tensor
 
         print(rec_error)
@@ -347,10 +347,15 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
             for i in range(n_part):
                 factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _ = QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
                 # print("the line is:", sys._getframe().f_lineno, "factor_tensor.shape", factors[index].shape)
-        vector_core = pinv(multi_mat_kr(factors, R=n_part)).dot(tensor.reshape(-1, 1))
-        len_core = vector_core.shape[0]//n_part
+
+        #rebuilt core tensor
         for i in range(n_part):
-            core[i] = vector_core[i*len_core:(i+1)*len_core].reshape(ranks)
+            factors_rebult = []
+            for mode in modes:
+                index = mode - 1
+                factors_rebult.append(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
+
+            core[i] = multi_mode_dot(tensor, factors_rebult, modes = modes, transpose=True)
             # print("the line is:", sys._getframe().f_lineno, "core_tensor.shape", core[i].shape)
 
         # according the core tensor and the factor matrix, 对原矩阵进行恢复
