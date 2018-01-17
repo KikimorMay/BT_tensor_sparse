@@ -357,10 +357,22 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
                 factors_rebult.append(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
             core[i] = multi_mode_dot(tensor, factors_rebult, modes = modes, transpose=True)
 
+
         rebuilt_tensor = rebuilt_block_term_tensor(core, factors, modes)
         err = norm(rebuilt_tensor-tensor, 2)/norm(tensor,2)
 
         print('iteration is:', iteration, 'err is:', err)
+
+
+        vector_core = pinv(multi_mat_kr(factors, R=n_part)).dot(tensor.reshape(-1, 1))
+        len_core = vector_core.shape[0]//n_part
+        for i in range(n_part):
+            core_2[i] = vector_core[i*len_core:(i+1)*len_core].reshape(ranks)
+
+        rebuilt_tensor_2 = rebuilt_block_term_tensor(core_2, factors, modes)
+        err_2 = norm(rebuilt_tensor_2 - tensor, 2)/norm(tensor, 2)
+
+        print('iteraton is :', iteration, 'err_2_vector_core is:', err_2)
 
         rec_errors.append(err)
 
@@ -375,9 +387,9 @@ if __name__ == '__main__':
     image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
     data_2 = np.random.randn(30,30,30)
-    ranks = [10, 10, 10]
-    partial_tucker(data, modes=[1,2,3], ranks=ranks, init= None)
-    core, factors, err , iteration = block_term_tensor_decomposition(data, modes=[1,2,3], ranks = ranks, n_part = 2)
+    ranks = [10, 10, 3]
+    partial_tucker(image, modes=[1,2,3], ranks=ranks, init= None)
+    core, factors, err , iteration = block_term_tensor_decomposition(image, modes=[1,2,3], ranks = ranks, n_part = 2)
     print('block_term_tucker err is:', err)
 
 
