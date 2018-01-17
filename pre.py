@@ -9,6 +9,12 @@ from scipy.misc import face, imresize
 import sys
 
 def constract_data(rank, size, noise):
+    """
+    :param rank: 需要生成的数据的rank,是一个数，这个对应的是cp rank
+    :param size: 生成的数据的size,应该是一个list
+    :param noise: 随机生成的噪声的大小，0.几
+    :return: 没有加上噪声的数据， 以及加上噪声的数据，这里数据的大小都为-1——1
+    """
     ans = np.zeros(size)
     for i in range(rank):
         mid_ans = np.random.randn(size[0], 1)
@@ -18,10 +24,9 @@ def constract_data(rank, size, noise):
             mid_ans = np.outer(mid_ans, b)
         mid_ans = mid_ans.reshape(size)
         ans += mid_ans
-
-    e =  noise * rank * np.random.randn(*size)
-    ans = ans + e
-    return ans
+    e =  noise * np.random.randn(*size)
+    ans_noise = ans + e
+    return ans, ans_noise
 
 def change(a, b):
     c = a
@@ -282,7 +287,7 @@ def rebuilt_block_term_tensor(cores, factors, modes):
     return rebuilt_tensor
 
 def partial_tucker(tensor, modes, ranks = None, init = 'SVD',  n_iter_max =100,
-                   tol = 10e-5, random_state = None, verbose = True):
+                   tol = 10e-7, random_state = None, verbose = True):
     #Parameters:
     #modes: int list, 列表中是需要进行分解的模式
     #rank: core tensor 的size, 和需要分解的维度的个数相同,每个值是每个维度上需要的分解的秩
@@ -330,14 +335,17 @@ def partial_tucker(tensor, modes, ranks = None, init = 'SVD',  n_iter_max =100,
                 break
     return core, factors
 
-def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_max = 100, tol = 10e-5, random_state = None):
+def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_max = 1000, tol = 10e-7, random_state = None):
     if ranks == None:
         ranks = [tensor.shape[index-1] for index in modes]
 
     # 随机生成core-tensor，以及factor matrixs
+    err_min  = 1
     rng = check_random_state(random_state)
     core = [np.array(rng.random_sample(ranks)) for i in range(n_part)]
     factors = [np.array(rng.random_sample((tensor.shape[index], ranks[index]*n_part))) for index,mode in enumerate(modes)]
+    core_return = core
+    factors_return = factors
 
     rec_errors = []
     for iteration in range(n_iter_max):
@@ -345,7 +353,7 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
             index = mode - 1
             factors[index] = (blockdiag(core, mode).dot(pinv(multi_mat_kr(factors, R=n_part, mode = mode))).dot(unfold(tensor, mode).T)).T
             for i in range(n_part):
-                factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _ = QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
+                factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _= QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
                 # print("the line is:", sys._getframe().f_lineno, "factor_tensor.shape", factors[index].shape)
 
         vector_core = pinv(multi_mat_kr(factors, R=n_part)).dot(tensor.reshape(-1, 1))
@@ -362,11 +370,15 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
         rec_errors.append(err)
 
         # print("the line is:", sys._getframe().f_lineno, "vector_core.shape",vector_core.shape)
-        if iteration > 100:
-            #if (np.abs(rec_errors[-1] - rec_errors[-2]) < tol):  # 跳出循环的条件
-            break
+        # if iteration > 3:
+        #     if (np.abs(rec_errors[-1] - err_min) < tol):  # 跳出循环的条件
+        #         return core_return, factors_return
+        #     if (rec_errors[-1] < err_min):
+        #         core_return  = core
+        #         factors_return = factors
+        #         err_min = rec_errors[-1]
 
-    return core, factors
+    return core_return, factors_return
     '''
     以下为得到的模式的转置：
     计算过程中原矩阵模式1的转置：
@@ -379,7 +391,23 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
 if __name__ == '__main__':
     image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
-    data_2 = np.random.randn(10,10,10)
-    ranks = [9, 9, 9]
-    partial_tucker(data_2, modes=[1,2,3], ranks=ranks, init= None)
-    block_term_tensor_decomposition(data_2, modes=[1,2,3], ranks = ranks, n_part = 2)
+    ranks = [3,3,3]
+
+    data_2 = np.random.rand(50, 50, 50)
+
+
+    partial_tucker(data, modes=[1,2,3], ranks=ranks, init= None)
+    core, factors = block_term_tensor_decomposition(data, modes=[1,2,3], ranks = ranks, n_part = 2)
+    rebuilt_block_tenm = rebuilt_block_term_tensor(core, factors, modes = [1,2,3])
+    last_err = norm(rebuilt_block_tenm - data, 2)/norm(data, 2)
+    print('last_err:', last_err)
+
+"""
+    image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
+    ranks = [5, 5, 5]
+    partial_tucker(image, modes=[1,2,3], ranks=ranks, init= None)
+    core, factors = block_term_tensor_decomposition(image, modes=[1,2,3], ranks = ranks, n_part = 2)
+    这样能得到的结果是partial_tucker：0.200653218075
+    而block term tucker 能够得到的结果是：0.136258787007       n_part = 2
+    当n_part = 3时得到的最好结果是0.111315497456
+"""
