@@ -348,7 +348,6 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
             factors[index] = (blockdiag(core, mode).dot(pinv(multi_mat_kr(factors, R=n_part, mode = mode))).dot(unfold(tensor, mode).T)).T
             for i in range(n_part):
                 factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _ = QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
-                # print("the line is:", sys._getframe().f_lineno, "factor_tensor.shape", factors[index].shape)
 
         #rebuilt core tensor
         for i in range(n_part):
@@ -358,34 +357,27 @@ def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_
                 factors_rebult.append(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
             core[i] = multi_mode_dot(tensor, factors_rebult, modes = modes, transpose=True)
 
-
         rebuilt_tensor = rebuilt_block_term_tensor(core, factors, modes)
         err = norm(rebuilt_tensor-tensor, 2)/norm(tensor,2)
 
+        print('iteration is:', iteration, 'err is:', err)
+
         rec_errors.append(err)
 
-        # print("the line is:", sys._getframe().f_lineno, "vector_core.shape",vector_core.shape)
         if iteration > 3:
             if (np.abs(rec_errors[-1] - rec_errors[-2]) < tol):  # 跳出循环的条件
                 break
 
     return core, factors, rec_errors[-1], iteration
-    '''
-    以下为得到的模式的转置：
-    计算过程中原矩阵模式1的转置：
-    '''
-    for i in modes:
-        print("factor %d's shape is "%(i), factors[i-1].shape)
-    k = multi_mat_kr(factors, R = 2, mode = 3)
-    print(k.shape)
+
 
 if __name__ == '__main__':
     image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
     data_2 = np.random.randn(30,30,30)
-    ranks = [5, 5, 5]
-    partial_tucker(data_2, modes=[1,2,3], ranks=ranks, init= None)
-    core, factors, err , iteration = block_term_tensor_decomposition(data_2, modes=[1,2,3], ranks = ranks, n_part = 2)
-    print('block_term_tucker err is:', err, 'iteration is ', iteration)
+    ranks = [10, 10, 10]
+    partial_tucker(data, modes=[1,2,3], ranks=ranks, init= None)
+    core, factors, err , iteration = block_term_tensor_decomposition(data, modes=[1,2,3], ranks = ranks, n_part = 2)
+    print('block_term_tucker err is:', err)
 
 
