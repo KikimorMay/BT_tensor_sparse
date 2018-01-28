@@ -113,6 +113,19 @@ def QR(A):
     R = np.dot(Q.T, A)
     return (Q, R)
 
+def prox_Lasso(tensor, para):
+    e = tensor
+    shape = tensor.shape
+    data_plus = np.zeros(shape)
+    data_neg = np.zeros(shape)
+    a = tensor > para
+    b = tensor < -para
+    c = a|b
+    data_plus[a] = -para
+    data_neg[b] = para
+    e[c == False] = 0
+    return e + data_neg + data_plus
+
 # 计算数组们的Khatri-Rao product of a list of matrices
 # 输入应该是多个列数相同的矩阵
 def kr(matrices):                      # 输入n个数组
@@ -232,7 +245,7 @@ def multi_mat_kr(matrices, R, mode = None):
         ans_kron = mat_kr(matrices[0], matrices[1], R=R)
         index = 2
         while(index < n_matrice):
-            ans_kron = mat_kr(ans_kron, matrices[index], R = R)
+            ans_kron = mat_kr(ans_kron, matrices[index], R=R)
             index += 1
     return ans_kron
 
@@ -318,67 +331,60 @@ def partial_tucker(tensor, modes, ranks = None, init = 'SVD',  n_iter_max =100,
             factors[index] = eigenvecs
         core = multi_mode_dot(tensor, factors, modes = modes, transpose=True)
         #对tucker分解得到的部分进行重构形成新的tensor
-        middle_ans = multi_mode_dot(core, factors,modes= modes, transpose=False)
+        middle_ans = multi_mode_dot(core, factors, modes= modes, transpose=False)
         rec_error = norm(tensor - middle_ans, 2)/norm_tensor
-
-        print(rec_error)
         rec_errors.append(rec_error)
 
         if iteration > 1:
-            if verbose:
-                print('reconsturction error={}, variation={}.'.format(
-                    rec_errors[-1], rec_errors[-2] - rec_errors[-1]))
+            # if verbose:
+            #     print('reconsturction error={}, variation={}.'.format(
+            #         rec_errors[-1], rec_errors[-2] - rec_errors[-1]))
 
             if (rec_errors[-2] - rec_errors[-1] < tol):
                 if verbose:
-                    print('converged in {} iterations.'.format(iteration))
+                    print('converged in {} iterations.'.format(iteration), 'reconsturction error={}, variation={}.'.format(
+                    rec_errors[-1], rec_errors[-2] - rec_errors[-1]))
                 break
-    return core, factors
+    return core, factors, middle_ans
 
-def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_max = 1000, tol = 10e-7, random_state = None):
+def block_term_tensor_decomposition(tensor, modes, n_part, ranks = None, n_iter_max = 1000, tol = 10e-5, random_state = None):
     if ranks == None:
         ranks = [tensor.shape[index-1] for index in modes]
 
     # 随机生成core-tensor，以及factor matrixs
-    err_min  = 1
     rng = check_random_state(random_state)
     core = [np.array(rng.random_sample(ranks)) for i in range(n_part)]
     factors = [np.array(rng.random_sample((tensor.shape[index], ranks[index]*n_part))) for index,mode in enumerate(modes)]
-    core_return = core
-    factors_return = factors
 
     rec_errors = []
     for iteration in range(n_iter_max):
         for mode in modes:
             index = mode - 1
-            factors[index] = (blockdiag(core, mode).dot(pinv(multi_mat_kr(factors, R=n_part, mode = mode))).dot(unfold(tensor, mode).T)).T
+            factors[index] = (blockdiag(core, mode).dot(pinv(multi_mat_kr(factors, R=n_part, mode=mode))).dot(unfold(tensor, mode).T)).T
             for i in range(n_part):
-                factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _= QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
+                factors[index][:, i*ranks[index]:(i+1)*ranks[index]], _ = QR(factors[index][:, i*ranks[index]:(i+1)*ranks[index]])
                 # print("the line is:", sys._getframe().f_lineno, "factor_tensor.shape", factors[index].shape)
 
         vector_core = pinv(multi_mat_kr(factors, R=n_part)).dot(tensor.reshape(-1, 1))
         len_core = vector_core.shape[0]//n_part
         for i in range(n_part):
             core[i] = vector_core[i*len_core:(i+1)*len_core].reshape(ranks)
-            # print("the line is:", sys._getframe().f_lineno, "core_tensor.shape", core[i].shape)
 
         # according the core tensor and the factor matrix, 对原矩阵进行恢复
         rebuilt_tensor = rebuilt_block_term_tensor(core, factors, modes)
         err = norm(rebuilt_tensor-tensor, 2)/norm(tensor,2)
-        print("line:", sys._getframe().f_lineno, 'interation is :', iteration, "err is", err )
+        # print("line:", sys._getframe().f_lineno, 'interation is :', iteration, "err is", err )
 
         rec_errors.append(err)
 
         # print("the line is:", sys._getframe().f_lineno, "vector_core.shape",vector_core.shape)
-        # if iteration > 3:
-        #     if (np.abs(rec_errors[-1] - err_min) < tol):  # 跳出循环的条件
-        #         return core_return, factors_return
-        #     if (rec_errors[-1] < err_min):
-        #         core_return  = core
-        #         factors_return = factors
-        #         err_min = rec_errors[-1]
+        if iteration > 3:
+            if (np.abs(rec_errors[-1] - rec_errors[-2]) < tol):  # 跳出循环的条件
+                print('converged in {} iteration :'.format(iteration), 'reconsturction error={}, variation={}.'.format(
+                    rec_errors[-1], rec_errors[-2] - rec_errors[-1]))
+                break
 
-    return core_return, factors_return
+    return core, factors, rebuilt_tensor
     '''
     以下为得到的模式的转置：
     计算过程中原矩阵模式1的转置：
@@ -393,14 +399,12 @@ if __name__ == '__main__':
     data = load_mat('Indian_pines.mat')   # data has shape(145,145,220)
     ranks = [3,3,3]
 
-    data_2 = np.random.rand(50, 50, 50)
+    data_2 = np.random.rand(30, 18, 45)
 
 
     partial_tucker(data, modes=[1,2,3], ranks=ranks, init= None)
-    core, factors = block_term_tensor_decomposition(data, modes=[1,2,3], ranks = ranks, n_part = 2)
-    rebuilt_block_tenm = rebuilt_block_term_tensor(core, factors, modes = [1,2,3])
-    last_err = norm(rebuilt_block_tenm - data, 2)/norm(data, 2)
-    print('last_err:', last_err)
+    core, factors, _ ,  err = block_term_tensor_decomposition(data, modes=[1,2,3], ranks = ranks, n_part = 2)
+    print('last_err:', err)
 
 """
     image = np.array(imresize(face(), 0.1), dtype='float64') #image has shape(768,1024,3)*0.3 = (230,307,3)
