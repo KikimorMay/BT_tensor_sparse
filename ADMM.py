@@ -112,7 +112,7 @@ if __name__ == '__main__':
     out = open('record.txt', 'w')
 
     data = load_mat('Indian_pines.mat')
-    ranks = [10, 10, 10]
+    ranks = [6, 6, 6]
     ADMM(data, ranks, 1000)
 
 
@@ -141,6 +141,9 @@ RSM_tensor: 0.0743352843409
 
 '''
 
+# ranks = [5,5,5]
+# Interation is 2052 RSM is 0.0871016588594
+# RSM_tensor: 0.0923778690785
 
 
 
